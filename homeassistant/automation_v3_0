@@ -1,0 +1,92 @@
+alias: "Solar: Marstek EMS V3.0 - Adaptive Regelung & Zeitlogik"
+description: >-
+  Professionelle Verbrauchsoptimierung für Marstek B2500.
+  Features: Hand-Modus, dynamische Tag/Nacht-Umschaltung, SOC-Schutz 
+  und adaptive Schrittweiten zur Kompensation der BLE-Latenz.
+
+triggers:
+  - trigger: state
+    entity_id: sensor.netz_gesamtbezug
+    for:
+      seconds: 14 # Berücksichtigung der BLE-Verarbeitungszeit
+  - trigger: state
+    entity_id: input_boolean.marstek_hand_modus
+
+actions:
+  - choose:
+      # FALL 1: Manueller Modus ist aktiv
+      - conditions:
+          - condition: state
+            entity_id: input_boolean.marstek_hand_modus
+            state: "on"
+        sequence:
+          - action: number.set_value
+            target:
+              entity_id: number.b2500_b2500_1_b2500_discharge_threshold
+            data:
+              value: 0
+
+      # FALL 2: Automatik-Modus (Regelung aktiv)
+      - conditions:
+          - condition: state
+            entity_id: input_boolean.marstek_hand_modus
+            state: "off"
+        sequence:
+          - variables:
+              # Konfiguration der IDs
+              regler_id: number.b2500_b2500_1_b2500_discharge_threshold
+              soc_id: sensor.b2500_b2500_1_b2500_battery_level
+              pv_intern_id: sensor.b2500_b2500_1_b2500_total_power_in
+              
+              # Aktuelle Werte einlesen
+              aktuell: "{{ states(regler_id) | float(0) }}"
+              netz: "{{ states('sensor.netz_gesamtbezug') | float(0) }}"
+              soc: "{{ states(soc_id) | float(0) }}"
+              pv_extern: "{{ states('sensor.pv_1_einspeissung') | float(0) }}"
+              
+              # Zeit-Logik: Prüfen ob PV-Leistung seit > 20 Min unter 5W (Nacht-Erkennung)
+              pv_ausfall_lang: |-
+                {{ states(pv_intern_id) | float(0) <= 5 and 
+                   (as_timestamp(now()) - as_timestamp(states[pv_intern_id].last_changed | default(now()))) > 1200 }}
+              
+              # Zustandsbestimmung (Tag: -200W Ziel | Nacht: +100W Ziel)
+              ist_tag: "{{ pv_extern > 250 or not pv_ausfall_lang }}"
+              ziel_wert: "{{ -200 if ist_tag else 100 }}"
+              
+              # Regelungs-Parameter
+              fehler: "{{ netz - ziel_wert }}"
+              deadzone: 10
+              
+              # Adaptive Schrittweite (P-Anteil)
+              max_step: >-
+                {% if netz < -500 or fehler | abs > 300 %} 150 {% else %} 40 {% endif %}
+              
+              # Berechnung des Korrektur-Schritts
+              step: |-
+                {% if fehler < -deadzone %}
+                  {{ [fehler, (max_step * -1)] | max }}
+                {% elif fehler > deadzone %}
+                  {{ [fehler, max_step] | min }}
+                {% else %}
+                  0
+                {% endif %}
+              
+              # Finaler Sollwert unter Berücksichtigung von SOC und Hardware-Limits
+              roh_ziel: "{{ aktuell + step }}"
+              final_soll: >-
+                {{ [[roh_ziel | float, 0] | max, 800] | min if soc > 10 else 0 }}
+
+          # Ausführung der Regelung nur bei relevanter Änderung
+          - if:
+              - condition: template
+                value_template: |
+                  {{ (final_soll | float | round(0) - aktuell) | abs >= 10 
+                      and states(soc_id) not in ['unknown', 'unavailable'] }}
+            then:
+              - action: number.set_value
+                target:
+                  entity_id: number.b2500_b2500_1_b2500_discharge_threshold
+                data:
+                  value: "{{ final_soll | float | round(0) }}"
+
+mode: restart
