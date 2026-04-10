@@ -1,0 +1,119 @@
+# ##################################################################
+# Marstek B2500 Controller Config - V3.0 (Full Edition)
+# ------------------------------------------------------------------
+# Nutzt die externe Komponente von: https://github.com/tomquist/esphome-b2500
+# Logik-Anpassungen & Full-Entity-Map: Dom0609
+# ##################################################################
+
+esphome:
+  name: "b2500-controller"
+  friendly_name: "Marstek B2500 Controller"
+  project:
+    name: "dom0609.marstek_b2500_optimizer"
+    version: "3.0"
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+external_components:
+  - source: github://tomquist/esphome-b2500
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  fast_connect: true
+
+api:
+  password: !secret api_password
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+logger:
+  level: INFO
+
+esp32_ble_tracker:
+  scan_parameters:
+    duration: 30s
+    interval: 300ms
+    window: 200ms
+
+time:
+  - platform: sntp
+    id: sntp_time
+
+b2500:
+  - id: b2500_1
+    mac_address: !secret b2500_mac_address
+    update_interval: 14s
+
+sensor:
+  - platform: b2500
+    b2500_id: b2500_1
+    # Batteriestand & Gesundheit
+    battery_level:
+      name: "Batterie Ladestand"
+    battery_capacity:
+      name: "Batterie Kapazität"
+    # Leistungsdaten
+    total_power_in:
+      name: "Gesamtleistung Eingang"
+    total_power_out:
+      name: "Gesamtleistung Ausgang"
+    pv1_power_in:
+      name: "PV1 Leistung"
+    pv2_power_in:
+      name: "PV2 Leistung"
+    # Spannungen & Ströme
+    battery_voltage:
+      name: "Batterie Spannung"
+    battery_current:
+      name: "Batterie Strom"
+    # Temperaturen
+    battery_temperature:
+      name: "Batterie Temperatur"
+
+binary_sensor:
+  - platform: b2500
+    b2500_id: b2500_1
+    charging:
+      name: "Ladevorgang aktiv"
+    discharging:
+      name: "Entladevorgang aktiv"
+    connected:
+      name: "BLE Verbindung Status"
+
+number:
+  - platform: b2500
+    b2500_id: b2500_1
+    # Wichtig für die Automation: Steuerung der Ausgangsleistung
+    discharge_threshold:
+      name: "Ausgangsbegrenzung (Watt)"
+      min_value: 0
+      max_value: 800
+      step: 1
+    # Ladestopp-Grenzen
+    charge_limit:
+      name: "Lade-Limit (%)"
+    discharge_limit:
+      name: "Entlade-Limit (%)"
+
+switch:
+  - platform: b2500
+    b2500_id: b2500_1
+    # Schalter für die Ausgänge
+    out1_port_enable:
+      name: "Ausgang 1 Aktivieren"
+    out2_port_enable:
+      name: "Ausgang 2 Aktivieren"
+
+text_sensor:
+  - platform: b2500
+    b2500_id: b2500_1
+    device_model:
+      name: "Modellbezeichnung"
+    firmware_version:
+      name: "Firmware Version"
