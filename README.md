@@ -39,9 +39,10 @@ Um Schwingungen zu vermeiden, reagiert die Korrekturgeschwindigkeit (`max_step`)
 * **Shelly 1PM:** Zur Überwachung der Störgröße (PV1-Einspeisung).
 
 ## Installation
+
 1. `secrets.yaml` lokal anlegen (nicht im Repo hochladen!).
-2. ESP32 mit der bereitgestellten `b2500-controller.yaml` flashen.
-3. Automation (YAML) in Home Assistant importieren und die Entitäten an die eigenen Shelly-IDs anpassen.
+2. ESP32 mit der bereitgestellten [b2500-controller.yaml](./esphome/b2500-controller.yaml) flashen (Details siehe [ESPHome Guide](./esphome/README_ESP32.md)).
+3. Automation in Home Assistant importieren (Details zur Logik siehe [Automations Guide](./homeassistant/README_Automation.md)) und die Entitäten an die eigenen Shelly-IDs anpassen.
 
 ## Credits & Quellen
 * **BLE-Integration:** Basiert auf der Vorarbeit von [tomquist/esphome-b2500](https://github.com/tomquist/esphome-b2500).
