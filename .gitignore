@@ -1,0 +1,5 @@
+# Geheimnisse schützen
+secrets.yaml
+# ESPHome temporäre Dateien
+.esphome/
+build/
