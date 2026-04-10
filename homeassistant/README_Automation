@@ -1,0 +1,34 @@
+# Marstek B2500 Regelungs-Logik (V3.0)
+
+Diese Automation steuert die Ausgangsleistung des Marstek B2500 basierend auf den Werten eines Shelly 3EM am Hausanschluss. Ziel ist die maximale Eigenverbrauchsoptimierung unter Berücksichtigung der systembedingten Bluetooth-Latenz.
+
+## Hauptmerkmale
+* **Duales Zielwert-Konzept:** * **Tag:** -200W (leichte Einspeisung), um den Akku bevorzugt zu laden und Schwankungen durch den zweiten, ungeregelten Wechselrichter (PV1) abzufangen.
+    * **Nacht:** +100W (Sicherheits-Bezug), um bei plötzlichen Lastwechseln keine Energie ins Netz zu verschenken, bevor der Regler reagieren kann.
+* **Adaptive Schrittweite (P-Regler):** * Große Korrekturen (150W) bei Fehlern > 300W.
+    * Feine Korrekturen (40W) im Zielbereich.
+* **Hand-Modus:** Über einen `input_boolean` kann die Automatik jederzeit deaktiviert werden (setzt Entladung auf 0W).
+* **SOC-Schutz:** Sinkt die Batterie unter 10%, wird die Entladung sofort gestoppt.
+
+## Voraussetzungen
+Folgende Entitäten müssen in Home Assistant vorhanden sein:
+
+| Entität | Typ | Beschreibung |
+| :--- | :--- | :--- |
+| `sensor.netz_gesamtbezug` | Sensor | Shelly 3EM Summenleistung |
+| `sensor.pv_1_einspeissung` | Sensor | Ertrag des zweiten (ungestörten) WR |
+| `input_boolean.marstek_hand_modus` | Helfer | Schalter für manuellen Modus |
+| `number.b2500_..._discharge_threshold` | Number | Der ESPHome-Regler |
+
+## Die Zeit-Logik (Tag/Nacht Erkennung)
+Die Automation unterscheidet intelligent zwischen Tag und Nacht, ohne einen starren Sonnenuntergangs-Zeitpunkt zu nutzen:
+1.  **PV-Trigger:** Wenn PV1 > 250W liefert, gilt "Tag".
+2.  **Latenz-Schutz:** Erst wenn der interne PV-Input des Marstek für mehr als **20 Minuten** unter 5W liegt, schaltet das System in den Nacht-Modus (+100W Target). Dies verhindert falsches Umschalten bei kurzen Gewitterwolken.
+
+## Installation
+1.  Erstelle den Helfer `input_boolean.marstek_hand_modus` unter Einstellungen -> Helfer.
+2.  Erstelle eine neue Automation, wechsle in den YAML-Modus und kopiere den Inhalt der `automation_v3_0.yaml` hinein.
+3.  Passe ggf. die Entitäten-Namen an deine Umgebung an.
+
+---
+**Hinweis von Dom0609:** Diese Logik ist auf Stabilität optimiert. Durch das 14-Sekunden-Intervall wird der ESP32-Bluetooth-Stack geschont und die Hardware-Lebensdauer des Marstek-BMS verlängert.
