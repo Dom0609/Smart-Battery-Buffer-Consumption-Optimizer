@@ -1,0 +1,40 @@
+# ESP32 Marstek Bridge (ESPHome)
+
+Diese Komponente fungiert als Brücke (Gateway) zwischen dem Marstek B2500 Speicher und Home Assistant. Die technische Grundlage für die Kommunikation bildet die Arbeit von **tomquist**.
+
+## Technische Basis
+Dieses Projekt nutzt die externe ESPHome-Komponente von **[tomquist/esphome-b2500](https://github.com/tomquist/esphome-b2500)**. 
+Ohne seine Pionierarbeit bei der Entschlüsselung des Marstek-Protokolls wäre diese lokale Steuerung nicht möglich. Mein Beitrag konzentriert sich auf die Optimierung der Stabilität und die Einbindung in eine komplexe Regelungslogik (V3.0).
+
+## Hardware-Spezifikationen
+* **Board:** ESP32 DevKit V1 (WROOM-32).
+* **Framework:** **Arduino**. 
+  * *Wichtiger Hinweis:* Es wird zwingend das Arduino-Framework empfohlen. Die Bluetooth-Stacks unter Arduino laufen mit der Marstek Generation 1 deutlich stabiler als unter ESP-IDF.
+
+## Technische Konfiguration & Optimierungen
+
+Um einen stabilen Dauerbetrieb zu gewährleisten, wurden folgende Parameter optimiert:
+
+### 1. Bluetooth (BLE) Parameter
+* **Scan-Dauer:** 30 Sekunden.
+* **Scan-Intervall / Window:** 300ms / 200ms. 
+  * Diese Werte schaffen "Atempausen" für den Funkchip und verhindern Abstürze des BLE-Stacks bei dauerhafter Abfrage.
+* **Update-Intervall:** 10 bis 15 Sekunden. 
+  * Ein schnelleres Intervall (< 10s) führt bei der Marstek Gen 1 häufig zu Verbindungsabbüchen.
+
+### 2. Konnektivität & Sicherheit
+* **Reboot Timeout (MQTT):** 15 Minuten. 
+  * Verhindert unnötige Boot-Schleifen bei Wartungsarbeiten am Server oder WLAN-Ausfällen.
+* **Fast Connect:** Aktiviert für schnelle Wiederverbindung nach Stromausfall.
+
+### 3. Zeit-Synchronisation (SNTP)
+Der ESP32 synchronisiert bei jeder erfolgreichen Verbindung die aktuelle Systemzeit (`b2500.set_datetime`) mit dem Marstek B2500. Dies stellt sicher, dass die internen Fehler-Logs des Speichers immer korrekte Zeitstempel haben.
+
+## Installation & Flash-Vorgang
+
+1. Erstelle eine `secrets.yaml` im Ordner `/esphome` mit deinen Zugangsdaten.
+2. Stelle sicher, dass die externe Komponente von **tomquist** in deiner YAML korrekt referenziert ist (siehe `b2500-controller.yaml`).
+3. Schließe den ESP32 per USB an.
+4. Flashen:
+   ```bash
+   esphome run b2500-controller.yaml
