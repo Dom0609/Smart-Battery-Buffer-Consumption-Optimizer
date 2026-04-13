@@ -1,81 +1,76 @@
-# Smart Battery Buffer & Consumption Optimizer (V4.0 - MQTT Edition)
+# Smart Battery Buffer & Consumption Optimizer (v1.0.0 - Stable Release)
 
-> ### ⚠️ STATUS: AKTIVE BETA-TESTPHASE
-> **Projekt-Update (April 2026):** Migration von ESP32/BLE auf MQTT-Bridge abgeschlossen. Dieses Setup befindet sich in der Validierung. Die Nutzung erfolgt auf eigene Gefahr.
+⚠️ **STATUS: STABLE RELEASE (April 2026)**
+Dieses Setup hat die Validierungsphase erfolgreich abgeschlossen. Nach der Migration auf die MQTT-Architektur und intensiven Feldtests mit Hybrid-PV-Systemen ist die Version 1.0.0 nun der empfohlene Standard für maximale Stabilität und Hardwareschonung.
 
-> ### 🛑 ENTWICKLUNGS-HINWEIS & COMMUNITY
-> Die bisherige **ESP32/BLE-Steuerung (V3.0)** wird von mir persönlich nicht mehr aktiv weiterentwickelt, da die MQTT-Lösung für meine Anforderungen die notwendige Stabilität und Latenzfreiheit bietet. 
-> 
-> **Open for Contributions:** Falls jemand das ESP32-Projekt weiterverfolgen oder für seine Zwecke optimieren möchte – nur zu! Der Code bleibt als Basis im Repository erhalten. Ich freue mich sehr, wenn ihr eure Ergebnisse, Optimierungen oder alternative Automationen über **Issues** oder **Pull Requests** hier im Projekt teilt!
+> ### 🛑 ENTWICKLUNGS-HINWEIS
+> Die bisherige **ESP32/BLE-Steuerung (V3.0)** wird nicht mehr aktiv weiterentwickelt. Die MQTT-Lösung bietet die notwendige Latenzfreiheit für eine präzise Regelung. Der alte Code bleibt für Community-Projekte im Archiv erhalten.
 
 ---
 
 ## Über dieses Projekt
-Dieses Repository dokumentiert das persönliche Setup von **Dom0609**. Ziel ist die intelligente Eigenverbrauchsoptimierung eines Marstek/Hame Speichersystems.
+Dieses Repository dokumentiert das optimierte Setup von **Dom0609**. Ziel ist die intelligente Eigenverbrauchsoptimierung eines Marstek/Hame Speichersystems (B2500 / HMJ-2) in einer dynamischen Umgebung.
 
-Nach intensiven Tests mit ESP32-basierten Bluetooth-Lösungen wurde das System auf eine **MQTT-Architektur** umgestellt. Dieser Durchbruch ermöglichte erstmals eine nahezu latenzfreie Steuerung und eine zuverlässige Überwachung der Hardware.
+Durch den Einsatz einer **lokalen MQTT-Architektur** und einer **Hysterese-basierten Regelungslogik** wurde ein System geschaffen, das trotz Cloud-Latenzen und schwankender Lasten eine zuverlässige Nulleinspeisung ermöglicht.
 
-## Die Architektur: Von BLE zu MQTT
-Ein zentraler Dank geht an **TomQuist**. Sein Add-on **[hm2mqtt](https://github.com/tomquist/hm2mqtt)** bildet das Rückgrat der Version 4.0.
+## Die Architektur: Performance & Transparenz
+Dank des Add-ons **[hm2mqtt](https://github.com/tomquist/hm2mqtt)** von **TomQuist** konnte die Systemperformance massiv gesteigert werden.
 
-| Feature | Legacy (V3.0 ESP32/BLE) | Aktuell (V4.0 MQTT) |
+| Feature | Legacy (V3.0 ESP32/BLE) | Aktuell (v1.0.0 Stable) |
 | :--- | :--- | :--- |
 | **Latenz** | ca. 14 Sekunden | < 1 Sekunde |
 | **Stabilität** | Funkabhängig (Bluetooth) | Hoch (Lokal/IP) |
-| **Transparenz** | Basis-Daten | Vollzugriff (inkl. 14 Einzelzellen) |
-| **Control** | Träge | Echtzeit-Befehle |
+| **Transparenz** | Basis-Daten | Vollzugriff (inkl. Einzelzellen) |
+| **Regelverhalten** | Träge & schwingungsanfällig | **Robust & Balanced** |
 
 ---
 
-## Das Szenario
-Das System optimiert den Eigenverbrauch in einer Umgebung mit zwei Energiequellen:
+## Das Szenario (Hybrid-PV)
+Das System ist speziell für Haushalte mit mehreren Energiequellen optimiert:
 * **Speicher:** Marstek B2500 / HAME Energy HMJ-2 (Geregelt via `hm2mqtt`).
-* **Zusatz-PV (PV1):** Ungeregelter Wechselrichter (Konstante Grund-Einspeisung).
-* **Sensorik:** * **Shelly 3EM:** Referenzwert am Hausanschluss (`sensor.netz_gesamtbezug`).
-    * **Shelly 1PM:** Überwachung der PV1-Störgröße.
+* **Zusatz-PV (PV1):** Ein zweiter, unabhängiger Wechselrichter (Balkonkraftwerk), dessen Ertrag als dynamische Störgröße einfließt.
+* **Sensorik:**
+    * **Shelly 3EM:** Referenzwert am Hausanschluss (`sensor.netz_gesamtbezug`).
+    * **Shelly (diverse):** Überwachung der PV1-Einspeisung (`sensor.pv_1_einspeissung`).
 
 ---
 
-## Regelungskonzept: Zustandsbasierter P-Regler
+## Regelungskonzept: "Balanced Hybrid"
 
-Die Logik arbeitet als Zustandsautomat in Home Assistant, um trotz hoher Lastwechsel eine Nulleinspeisung zu erreichen.
+Die Logik v1.0.0 setzt auf Ruhe im System statt nervösem Nachregeln.
 
 ### 1. Adaptive Zustandssteuerung
-* **Zustand: Ertrags-Phase (Tag)**
-    * **Trigger:** PV-Ertrag > 250W oder aktiver interner PV-Input.
-    * **Zielwert:** `-200W` (Bewusste leichte Einspeisung zur Priorisierung der Batterieladung).
-* **Zustand: Bezugs-Phase (Akku-Betrieb / Nacht)**
-    * **Trigger:** PV-Leistung seit > 20 Min. unter 5W.
-    * **Zielwert:** `+50W bis +100W` (Netzbezug als Sicherheitspuffer gegen Lastspitzen).
+* **Ertrags-Phase (Tag):**
+    * **Zielwert:** `-200W` am Netzanschluss. Dies priorisiert die Batterieladung und nutzt den Ertrag von PV1 optimal aus.
+* **Bezugs-Phase (Nacht):**
+    * **Zielwert:** `+100W` (Netzbezug). Dient als Sicherheitspuffer, um bei plötzlichen Lastwechseln keine unnötige Netzeinspeisung aus dem Akku zu provozieren.
 
-### 2. Dynamische Sicherheitsregeln (Deep Discharge Protection)
-Ein kritischer Bestandteil der V4.0 ist die automatische Rettungslogik:
-* **Trigger:** SoC < 10%.
-* **Aktion:** Erzwingt `Discharge Depth = 0`, um das System vor einer Notabschaltung zu schützen.
+### 2. Die v1.0.0 Stabilitäts-Features
+* **100W Hysterese (Deadzone):** Das System reagiert erst, wenn die Abweichung vom Zielwert mehr als 100W beträgt. Dies schont die Relais und die Leistungselektronik des Speichers massiv.
+* **Adaptive 100W-Steps:** Bei großen Lastsprüngen (z. B. Wasserkocher) korrigiert das System in 100W-Schritten. Das ermöglicht ein zügiges Erreichen des Zielwerts ohne "Überschwingen".
+* **Latenz-Management:** Durch die Reduktion der MQTT-Schreibbefehle (nur bei Bedarf außerhalb der Deadzone) wird die Kommunikation stabilisiert und ESP-Hänger vermieden.
 
-### 3. Variable Schrittweiten (Adaptive Gain)
-* **Grobausgleich (150W Steps):** Bei Fehlern > 300W für schnelle Reaktion.
-* **Feinausgleich (40W Steps):** Im Nahbereich zur Materialschonung.
-* **Hysterese:** 10W Deadzone zur Vermeidung von unnötigem "Regel-Rauschen".
+### 3. Deep Discharge Protection
+* **Rescue-Trigger:** Bei einem SoC < 11% wird die Entladung sofort gestoppt und der Lademodus erzwungen, um das System vor einer Notabschaltung zu schützen.
 
 ---
 
 ## Installation & Setup
-1. **MQTT Bridge:** Installation des [hm2mqtt Add-ons von TomQuist](https://github.com/tomquist/hm2mqtt). **Wichtig:** MQTT muss zuvor über den Marstek-Support (App-Feedback) freigeschaltet werden!
-2. **Home Assistant:** Die neue Automation wird nach Abschluss der Feinjustierung im Ordner `/v4_mqtt_control/` bereitgestellt.
-3. **Anpassung:** Entitäten müssen auf die eigene `deviceId` angepasst werden.
+1.  **MQTT Bridge:** Installation des [hm2mqtt Add-ons](https://github.com/tomquist/hm2mqtt). **Wichtig:** MQTT muss zuvor über den Marstek-Support (App-Feedback) freigeschaltet werden!
+2.  **Home Assistant:** Die finale Automation findet sich im Ordner `/homeassistant/`.
+3.  **Anpassung:** Ersetze die Platzhalter-Entitäten durch deine individuelle `deviceId`.
 
 ## Feedback & Mitarbeit
-Hast du bessere Parameter für die Schrittweiten gefunden oder eine effizientere Tag/Nacht-Erkennung gebaut? 
-* Eröffne ein **Issue**, um deine Ideen zu diskutieren.
-* Sende einen **Pull Request** mit deinen Verbesserungen.
-* Teile deine YAML-Konfigurationen, damit andere Nutzer davon profitieren können.
+Dieses Projekt ist auf Langlebigkeit ausgelegt (Ziel: 10 Jahre stabiler Betrieb). Optimierungsvorschläge zur weiteren Effizienzsteigerung sind willkommen!
+* Eröffne ein **Issue** für Diskussionen.
+* Teile deine Ergebnisse via **Pull Request**.
 
 ---
 
 ## Credits & Quellen
 * **MQTT-Brücke:** [tomquist/hm2mqtt](https://github.com/tomquist/hm2mqtt)
-* **Legacy-Inspiration:** [tomquist/esphome-b2500](https://github.com/tomquist/esphome-b2500)
+* **Inspiration:** Dank an die gesamte Community, die an der Entschlüsselung der Hame/Marstek-Protokolle mitgewirkt hat.
 
----
 *Erstellt von Dom0609 - 2026*
+
+
