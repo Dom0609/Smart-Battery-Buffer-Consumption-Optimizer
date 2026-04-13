@@ -1,0 +1,98 @@
+# GitHub: /homeassistant/stable_v1_0_mqtt/marstek_v1_0_0_stable.yaml
+# Version: v1.0.0 Stable
+# Strategie: Smart Offset (Hybrid-Ready)
+
+alias: "Marstek v1.0.0: Smart Hybrid Control"
+description: >-
+  Stabile Steuerung für Marstek/Hame Speicher via MQTT.
+  Features: 100W Hysterese (Deadzone), 100W Dynamik-Schritte, 
+  Hybrid-Support für externe PV-Anlagen (PV1), Akku-Schonmodus.
+  Optimiert für Systeme mit WLAN/MQTT Latenz.
+
+trigger:
+  - trigger: state
+    entity_id: sensor.netz_gesamtbezug # Hier deinen Shelly 3EM Sensor eintragen
+  - trigger: state
+    entity_id: sensor.pv_1_einspeissung # Optional: Sensor für zweiten Wechselrichter
+  - trigger: state
+    entity_id: input_boolean.marstek_hand_modus # Manueller Switch zum Pausieren
+
+actions:
+  - choose:
+      # FALL 1: SCHUTZMODUS (Manuell oder Akku leer < 11%)
+      - conditions:
+          - condition: or
+            conditions:
+              - condition: state
+                entity_id: input_boolean.marstek_hand_modus
+                state: "on"
+              - condition: numeric_state
+                entity_id: sensor.hame_energy_hma_1_18cedf9836c6_battery_percentage # deviceId anpassen!
+                below: 11
+        sequence:
+          - action: select.select_option
+            target:
+              entity_id: select.hame_energy_hma_1_18cedf9836c6_charging_mode # deviceId anpassen!
+            data:
+              option: "Fully Charge Then Discharge"
+          - action: number.set_value
+            target:
+              entity_id: number.hame_energy_hma_1_18cedf9836c6_time_period_1_output_value # deviceId anpassen!
+            data:
+              value: 0
+
+      # FALL 2: AUTOMATIK-BETRIEB (SoC > 10%)
+      - conditions:
+          - condition: state
+            entity_id: input_boolean.marstek_hand_modus
+            state: "off"
+          - condition: numeric_state
+            entity_id: sensor.hame_energy_hma_1_18cedf9836c6_battery_percentage # deviceId anpassen!
+            above: 10
+        sequence:
+          - variables:
+              # Konfiguration der Entitäten (deviceId hier 18cedf9836c6 ersetzen!)
+              regler_id: number.hame_energy_hma_1_18cedf9836c6_time_period_1_output_value
+              aktuell: "{{ states(regler_id) | float(0) }}"
+              netz: "{{ states('sensor.netz_gesamtbezug') | float(0) }}"
+              soc: "{{ states('sensor.hame_energy_hma_1_18cedf9836c6_battery_percentage') | float(0) }}"
+              
+              # PV-Logik zur Tag/Nacht Erkennung
+              pv_in: "{{ states('sensor.hame_energy_hma_1_18cedf9836c6_total_input_power') | float(0) }}"
+              bat_out: "{{ states('sensor.hame_energy_hma_1_18cedf9836c6_total_output_power') | float(0) }}"
+              ist_tag: "{{ pv_in > 50 and pv_in > bat_out }}"
+              
+              # Smart Offset Einstellungen
+              # Tag: -200W (Einspeisung zur Akku-Prio) | Nacht: 100W (Sicherheits-Bezug)
+              ziel_wert: "{{ -200 if ist_tag else 100 }}"
+              deadzone: 100
+              max_step: 100
+              
+              # Berechnung der Differenz
+              fehler: "{{ netz - ziel_wert }}"
+              
+              # Logik für adaptive Schritte innerhalb/außerhalb der Deadzone
+              step: |-
+                {% if fehler < -deadzone %}
+                  {{ [fehler, (max_step * -1)] | max }}
+                {% elif fehler > deadzone %}
+                  {{ [fehler, max_step] | min }}
+                {% else %}
+                  0
+                {% endif %}
+              
+              # Sicherheit: Unter 20% SoC Entladung stoppen
+              final_soll: "{{ (aktuell + step) if soc >= 20 else 0 }}"
+
+          # Ausführung nur bei notwendiger Änderung (schont MQTT-Traffic)
+          - if:
+              - condition: template
+                value_template: "{{ step | abs > 0 }}"
+            then:
+              - action: number.set_value
+                target:
+                  entity_id: "{{ regler_id }}"
+                data:
+                  value: "{{ [[((final_soll | float / 5) | round(0) * 5), 0] | max, 800] | min }}"
+
+mode: restart
