@@ -1,18 +1,22 @@
 # Smart Battery Buffer & Consumption Optimizer (V4.0 - MQTT Edition)
 
 > ### ⚠️ STATUS: AKTIVE BETA-TESTPHASE
-> **Projekt-Update (April 2026):** Migration von ESP32/BLE auf MQTT-Bridge abgeschlossen. 
-> Dieses Setup befindet sich in der Validierung. Die Nutzung erfolgt auf eigene Gefahr.
+> **Projekt-Update (April 2026):** Migration von ESP32/BLE auf MQTT-Bridge abgeschlossen. Dieses Setup befindet sich in der Validierung. Die Nutzung erfolgt auf eigene Gefahr.
+
+> ### 🛑 ENTWICKLUNGS-HINWEIS & COMMUNITY
+> Die bisherige **ESP32/BLE-Steuerung (V3.0)** wird von mir persönlich nicht mehr aktiv weiterentwickelt, da die MQTT-Lösung für meine Anforderungen die notwendige Stabilität und Latenzfreiheit bietet. 
+> 
+> **Open for Contributions:** Falls jemand das ESP32-Projekt weiterverfolgen oder für seine Zwecke optimieren möchte – nur zu! Der Code bleibt als Basis im Repository erhalten. Ich freue mich sehr, wenn ihr eure Ergebnisse, Optimierungen oder alternative Automationen über **Issues** oder **Pull Requests** hier im Projekt teilt!
 
 ---
 
 ## Über dieses Projekt
-Dieses Repository dokumentiert das persönliche Setup von **Dom0609**. Ziel ist die intelligente Eigenverbrauchsoptimierung eines Marstek/Hame Speichersystems. 
+Dieses Repository dokumentiert das persönliche Setup von **Dom0609**. Ziel ist die intelligente Eigenverbrauchsoptimierung eines Marstek/Hame Speichersystems.
 
-Nach intensiven Tests mit ESP32-basierten Bluetooth-Lösungen wurde das System auf eine **MQTT-Architektur** umgestellt. Dieser Durchbruch ermöglichte erstmals eine nahezu latenzfreie Steuerung und eine zuverlässige Fernwartung über große Distanzen (erfolgreich getestet auf 40 km Entfernung).
+Nach intensiven Tests mit ESP32-basierten Bluetooth-Lösungen wurde das System auf eine **MQTT-Architektur** umgestellt. Dieser Durchbruch ermöglichte erstmals eine nahezu latenzfreie Steuerung und eine zuverlässige Überwachung der Hardware.
 
 ## Die Architektur: Von BLE zu MQTT
-Ein zentraler Dank geht an **[TomQuist](https://github.com/tomquist)**. Sein Add-on **[hm2mqtt](https://github.com/tomquist/hm2mqtt)** bildet das Rückgrat der Version 4.0.
+Ein zentraler Dank geht an **TomQuist**. Sein Add-on **[hm2mqtt](https://github.com/tomquist/hm2mqtt)** bildet das Rückgrat der Version 4.0.
 
 | Feature | Legacy (V3.0 ESP32/BLE) | Aktuell (V4.0 MQTT) |
 | :--- | :--- | :--- |
@@ -40,9 +44,9 @@ Die Logik arbeitet als Zustandsautomat in Home Assistant, um trotz hoher Lastwec
 * **Zustand: Ertrags-Phase (Tag)**
     * **Trigger:** PV-Ertrag > 250W oder aktiver interner PV-Input.
     * **Zielwert:** `-200W` (Bewusste leichte Einspeisung zur Priorisierung der Batterieladung).
-* **Zustand: Bezugs-Phase (Nacht)**
+* **Zustand: Bezugs-Phase (Akku-Betrieb / Nacht)**
     * **Trigger:** PV-Leistung seit > 20 Min. unter 5W.
-    * **Zielwert:** `+100W` (Netzbezug als Sicherheitspuffer gegen Lastspitzen).
+    * **Zielwert:** `+50W bis +100W` (Netzbezug als Sicherheitspuffer gegen Lastspitzen).
 
 ### 2. Dynamische Sicherheitsregeln (Deep Discharge Protection)
 Ein kritischer Bestandteil der V4.0 ist die automatische Rettungslogik:
@@ -51,22 +55,27 @@ Ein kritischer Bestandteil der V4.0 ist die automatische Rettungslogik:
 
 ### 3. Variable Schrittweiten (Adaptive Gain)
 * **Grobausgleich (150W Steps):** Bei Fehlern > 300W für schnelle Reaktion.
-* **Feinausgleich (40W Steps):** Im Nahbereich zur Materialschonung (Relais/Komponenten).
+* **Feinausgleich (40W Steps):** Im Nahbereich zur Materialschonung.
 * **Hysterese:** 10W Deadzone zur Vermeidung von unnötigem "Regel-Rauschen".
 
 ---
 
 ## Installation & Setup
+1. **MQTT Bridge:** Installation des [hm2mqtt Add-ons von TomQuist](https://github.com/tomquist/hm2mqtt). **Wichtig:** MQTT muss zuvor über den Marstek-Support (App-Feedback) freigeschaltet werden!
+2. **Home Assistant:** Die neue Automation wird nach Abschluss der Feinjustierung im Ordner `/v4_mqtt_control/` bereitgestellt.
+3. **Anpassung:** Entitäten müssen auf die eigene `deviceId` angepasst werden.
 
-1.  **MQTT Bridge:** Installation des [hm2mqtt Add-ons von TomQuist](https://github.com/tomquist/hm2mqtt).
-2.  **Home Assistant:** Import der Automationen aus dem Ordner `/v4_mqtt_control/`.
-3.  **Anpassung:** Entitäten in der `secrets.yaml` oder direkt in der Automation auf die eigene `deviceId` anpassen.
+## Feedback & Mitarbeit
+Hast du bessere Parameter für die Schrittweiten gefunden oder eine effizientere Tag/Nacht-Erkennung gebaut? 
+* Eröffne ein **Issue**, um deine Ideen zu diskutieren.
+* Sende einen **Pull Request** mit deinen Verbesserungen.
+* Teile deine YAML-Konfigurationen, damit andere Nutzer davon profitieren können.
 
 ---
 
 ## Credits & Quellen
-* **MQTT-Brücke:** [tomquist/hm2mqtt](https://github.com/tomquist/hm2mqtt) - Ohne dieses Tool wäre die Fernwartung und Latenz-Optimierung nicht möglich gewesen.
-* **Legacy-Inspiration:** [tomquist/esphome-b2500](https://github.com/tomquist/esphome-b2500).
+* **MQTT-Brücke:** [tomquist/hm2mqtt](https://github.com/tomquist/hm2mqtt)
+* **Legacy-Inspiration:** [tomquist/esphome-b2500](https://github.com/tomquist/esphome-b2500)
 
 ---
 *Erstellt von Dom0609 - 2026*
