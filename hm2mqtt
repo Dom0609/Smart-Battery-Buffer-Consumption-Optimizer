@@ -1,0 +1,30 @@
+# hm2mqtt Gateway Integration (V4.0)
+
+Diese Komponente nutzt das **[hm2mqtt Add-on von TomQuist](https://github.com/tomquist/hm2mqtt)**. Im Gegensatz zur bisherigen ESP32-Lösung kommuniziert Home Assistant hierbei direkt über das WLAN-Modul des Speichers mit der lokalen Schnittstelle.
+
+## ⚠️ Zwingende Voraussetzung: MQTT-Freischaltung
+Bevor dieses Add-on oder die zugehörige Automation funktionieren kann, muss die **native MQTT-Schnittstelle** des Marstek/Hame-Geräts durch den Hersteller freigeschaltet werden.
+
+**Vorgehensweise für die Freischaltung:**
+1.  Öffne die Original-App (**Hame Energy** oder **Marstek**).
+2.  Navigiere zu **Profil** > **Hilfe & Feedback**.
+3.  Sende eine Nachricht mit der Bitte um **Freischaltung der MQTT-Funktion** für dein Gerät.
+4.  Übermittle zwingend die **Device-ID** (oder MAC-Adresse) deines Speichers.
+5.  Die Freischaltung erfolgt in der Regel innerhalb von 24–48 Stunden. Ohne diesen Schritt bleibt der Speicher im Netzwerk für MQTT-Befehle "stumm".
+
+---
+
+## Technische Vorteile der MQTT-Lösung
+* **Zero Hardware:** Es wird kein zusätzlicher ESP32 mehr benötigt.
+* **Echtzeit-Steuerung:** Nahezu verzögerungsfreie Umsetzung von Regelbefehlen (Latenz < 1s).
+* **Vollständige Diagnose:** Zugriff auf 14 Einzelzellspannungen, detaillierte Temperaturwerte und Fehlermeldungen des BMS.
+* **Fernwartung:** Stabilere Kommunikation, die auch bei räumlicher Distanz eine zuverlässige Rettung des Akkus (z. B. bei 0% SoC) ermöglicht.
+
+## Konfiguration & Einbindung
+
+1.  **Repository hinzufügen:** Füge im Home Assistant Add-on Store das Repository `https://github.com/tomquist/hm2mqtt` hinzu.
+2.  **Konfiguration:** Hinterlege die Zugangsdaten deines lokalen MQTT-Brokers (z. B. Mosquitto).
+3.  **Discovery:** Nach dem Start des Add-ons werden alle Entitäten (Sensoren und Stellgrößen) automatisch via MQTT-Discovery in Home Assistant angelegt.
+
+## Zentrale Entitäten für die Regelung
+Die Automation V4.0
