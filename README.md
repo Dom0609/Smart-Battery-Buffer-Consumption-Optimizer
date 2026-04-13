@@ -55,7 +55,7 @@ Um ein ständiges "Aufschaukeln" der Wechselrichter zu verhindern, arbeitet die 
 3.  **Home Assistant:** Die Automation (`/homeassistant/marstek_v1_0_0_stable.yaml`) importieren und die `deviceId` sowie Sensor-Entitäten anpassen.
 
 ## Feedback & Mitarbeit
-Das System ist auf Langlebigkeit ausgelegt (10-Jahres-Plan). Optimierungsvorschläge zur weiteren Effizienzsteigerung sind willkommen!
+Optimierungsvorschläge zur weiteren Effizienzsteigerung sind willkommen!
 
 ---
 
