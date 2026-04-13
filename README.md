@@ -1,63 +1,72 @@
-# Smart Battery Buffer & Consumption Optimizer (V3.0)
+# Smart Battery Buffer & Consumption Optimizer (V4.0 - MQTT Edition)
 
-> ### ⚠️ STATUS: EXPERIMENTELLE TESTPHASE (Work in Progress)
-> **Wichtiger Hinweis:** Dieses Projekt befindet sich in einer aktiven Entwicklungs- und Testphase. Die Regelungslogik wird täglich im Live-Betrieb verfeinert.
->
-> * **Einschränkungen:** Es kann vorkommen, dass die Regelung in bestimmten Szenarien (noch) nicht sauber reagiert, Schwingungen erzeugt oder die Bluetooth-Verbindung kurzzeitig verliert.
-> * **Haftungsausschluss:** Die Nutzung erfolgt auf eigene Gefahr. Ich übernehme keinerlei Haftung für Fehlfunktionen, Hardware-Schäden am BMS/Akku oder unerwartete Stromkosten.
+> ### ⚠️ STATUS: AKTIVE BETA-TESTPHASE
+> **Projekt-Update (April 2026):** Migration von ESP32/BLE auf MQTT-Bridge abgeschlossen. 
+> Dieses Setup befindet sich in der Validierung. Die Nutzung erfolgt auf eigene Gefahr.
 
 ---
 
 ## Über dieses Projekt
-Dieses Repository dokumentiert das persönliche Setup von **Dom0609**. Da ich langfristig auf ein System mit einem **Hoymiles HMT-2250** umsteige, dient dieser Stand als Archivierung meiner Erfahrungen mit der Marstek-Plattform. Die hier dokumentierte Logik löst die systembedingte Trägheit der Bluetooth-Steuerung (ca. 14s Latenz) durch ein intelligentes Regelkonzept.
+Dieses Repository dokumentiert das persönliche Setup von **Dom0609**. Ziel ist die intelligente Eigenverbrauchsoptimierung eines Marstek/Hame Speichersystems. 
+
+Nach intensiven Tests mit ESP32-basierten Bluetooth-Lösungen wurde das System auf eine **MQTT-Architektur** umgestellt. Dieser Durchbruch ermöglichte erstmals eine nahezu latenzfreie Steuerung und eine zuverlässige Fernwartung über große Distanzen (erfolgreich getestet auf 40 km Entfernung).
+
+## Die Architektur: Von BLE zu MQTT
+Ein zentraler Dank geht an **[TomQuist](https://github.com/tomquist)**. Sein Add-on **[hm2mqtt](https://github.com/tomquist/hm2mqtt)** bildet das Rückgrat der Version 4.0.
+
+| Feature | Legacy (V3.0 ESP32/BLE) | Aktuell (V4.0 MQTT) |
+| :--- | :--- | :--- |
+| **Latenz** | ca. 14 Sekunden | < 1 Sekunde |
+| **Stabilität** | Funkabhängig (Bluetooth) | Hoch (Lokal/IP) |
+| **Transparenz** | Basis-Daten | Vollzugriff (inkl. 14 Einzelzellen) |
+| **Control** | Träge | Echtzeit-Befehle |
+
+---
 
 ## Das Szenario
-Das System arbeitet in einer Umgebung mit zwei Energiequellen:
-* **Marstek B2500 (Gen 1):** Dynamisch geregelt via ESP32/ESPHome (BLE).
-* **Zweiter Wechselrichter (PV1):** Ungeregelt (liefert eine konstante Grund-Einspeisung).
-* **Messung:** Ein **Shelly 3EM** am Hausanschluss liefert den Referenzwert für die Regelung. Ein **Shelly 1PM** überwacht den Ertrag des ungeregelten PV1-Wechselrichters als zusätzliche Störgröße.
+Das System optimiert den Eigenverbrauch in einer Umgebung mit zwei Energiequellen:
+* **Speicher:** Marstek B2500 / HAME Energy HMJ-2 (Geregelt via `hm2mqtt`).
+* **Zusatz-PV (PV1):** Ungeregelter Wechselrichter (Konstante Grund-Einspeisung).
+* **Sensorik:** * **Shelly 3EM:** Referenzwert am Hausanschluss (`sensor.netz_gesamtbezug`).
+    * **Shelly 1PM:** Überwachung der PV1-Störgröße.
+
+---
 
 ## Regelungskonzept: Zustandsbasierter P-Regler
 
-Die Automation arbeitet wie ein industrieller Zustandsautomat, um die Latenz der Bluetooth-Strecke auszugleichen.
+Die Logik arbeitet als Zustandsautomat in Home Assistant, um trotz hoher Lastwechsel eine Nulleinspeisung zu erreichen.
 
 ### 1. Adaptive Zustandssteuerung
-Die Logik wechselt automatisch zwischen zwei Modi:
-
 * **Zustand: Ertrags-Phase (Tag)**
     * **Trigger:** PV-Ertrag > 250W oder aktiver interner PV-Input.
-    * **Zielwert:** `-200W` (Einspeisung).
-    * **Logik:** Während der Solarproduktion wird eine leichte Einspeisung toleriert. Dies priorisiert die Batterieladung und verhindert, dass der Regler gegen den Ladestrom arbeitet.
-* **Zustand: Bezugs-Phase (Akku-Betrieb / Nacht)**
+    * **Zielwert:** `-200W` (Bewusste leichte Einspeisung zur Priorisierung der Batterieladung).
+* **Zustand: Bezugs-Phase (Nacht)**
     * **Trigger:** PV-Leistung seit > 20 Min. unter 5W.
-    * **Zielwert:** `+100W` (Netzbezug).
-    * **Logik:** Um ungewollte Netzeinspeisung bei Lastwechseln trotz der 14s-Latenz zu vermeiden, wird ein bewusster Puffer zum Nullpunkt gehalten.
+    * **Zielwert:** `+100W` (Netzbezug als Sicherheitspuffer gegen Lastspitzen).
 
-### 2. Variable Schrittweiten (Adaptive Gain)
-Um Schwingungen zu vermeiden, reagiert die Korrekturgeschwindigkeit (`max_step`) dynamisch auf die Fehlergröße:
-* **Grobausgleich (150W Steps):** Bei Fehlern > 300W oder starker Einspeisung.
-* **Feinausgleich (40W Steps):** Im Nahbereich des Zielwerts zur Materialschonung.
-* **Hysterese (Deadzone 10W):** Verhindert unnötiges Regeln bei minimalen Rauschwerten der Sensoren.
+### 2. Dynamische Sicherheitsregeln (Deep Discharge Protection)
+Ein kritischer Bestandteil der V4.0 ist die automatische Rettungslogik:
+* **Trigger:** SoC < 10%.
+* **Aktion:** Erzwingt `Discharge Depth = 0`, um das System vor einer Notabschaltung zu schützen.
 
-## Hardware-Anforderungen
-* **ESP32 DevKit:** Geflasht mit ESPHome (Arduino Framework empfohlen).
-* **Shelly 3EM:** Als zentraler Netz-Sensor (`sensor.netz_gesamtbezug`).
-* **Shelly 1PM:** Zur Überwachung der Störgröße (PV1-Einspeisung).
+### 3. Variable Schrittweiten (Adaptive Gain)
+* **Grobausgleich (150W Steps):** Bei Fehlern > 300W für schnelle Reaktion.
+* **Feinausgleich (40W Steps):** Im Nahbereich zur Materialschonung (Relais/Komponenten).
+* **Hysterese:** 10W Deadzone zur Vermeidung von unnötigem "Regel-Rauschen".
 
-## Installation & Guides
+---
 
-1. **Secrets:** `secrets.yaml` lokal anlegen (nicht im Repo hochladen!).
-2. **ESPHome:** ESP32 mit der [b2500-controller.yaml](./esphome/b2500-controller.yaml) flashen. 
-    * *Details siehe [ESPHome Guide](./esphome/README_ESP32.md)*
-3. **Home Assistant:** Automation importieren und Entitäten anpassen.
-    * *Details zur Logik siehe [Automations Guide](./homeassistant/README_Automation.md)*
+## Installation & Setup
 
-## Feedback & Mitarbeit
-Da sich das System noch in der Validierung befindet, ist Feedback sehr willkommen! Falls du Optimierungen an den Schrittweiten oder der Tag/Nacht-Erkennung vorgenommen hast, eröffne gerne ein **Issue** oder einen **Pull Request**.
+1.  **MQTT Bridge:** Installation des [hm2mqtt Add-ons von TomQuist](https://github.com/tomquist/hm2mqtt).
+2.  **Home Assistant:** Import der Automationen aus dem Ordner `/v4_mqtt_control/`.
+3.  **Anpassung:** Entitäten in der `secrets.yaml` oder direkt in der Automation auf die eigene `deviceId` anpassen.
+
+---
 
 ## Credits & Quellen
-* **BLE-Integration:** Basiert auf der großartigen Vorarbeit von [tomquist/esphome-b2500](https://github.com/tomquist/esphome-b2500).
-* **Framework:** ESPHome & Home Assistant Community.
+* **MQTT-Brücke:** [tomquist/hm2mqtt](https://github.com/tomquist/hm2mqtt) - Ohne dieses Tool wäre die Fernwartung und Latenz-Optimierung nicht möglich gewesen.
+* **Legacy-Inspiration:** [tomquist/esphome-b2500](https://github.com/tomquist/esphome-b2500).
 
 ---
 *Erstellt von Dom0609 - 2026*
