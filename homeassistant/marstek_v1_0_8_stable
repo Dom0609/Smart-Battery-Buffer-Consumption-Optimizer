@@ -1,0 +1,116 @@
+#################################################################################
+# Smart Battery Buffer & Consumption Optimizer - v1.0.8 (Stable)
+# Autor: Dom0609 | Stand: April 2026
+#
+# REGELKONZEPT:
+# - Dynamic Turbo (150W / 20W Schritte)
+# - Anti-Bounce Protection (40W Mindestlast gegen 500W-Firmware-Bug)
+# - WLAN-Resilience (Optimierte Intervalle für RSSI < -80dBm)
+#################################################################################
+
+alias: "Marstek v1.0.8: Dynamic Turbo Stable"
+description: "Optimierte Steuerung gegen 500W-Sprünge und für maximale Stabilität."
+
+triggers:
+  - trigger: state
+    entity_id: sensor.netz_gesamtbezug # Dein Shelly-Summensensor
+    for:
+      seconds: 5 # Ruhezeit für Shelly-Schwankungen
+  - trigger: state
+    entity_id: input_boolean.marstek_hand_modus
+  - trigger: state
+    entity_id: input_boolean.marstek_entlade_freigabe
+
+actions:
+  - variables:
+      # --- INDIVIDUELLE ANPASSUNG HIER ---
+      regler_id: number.hame_energy_hma_1_18cedf9836c6_time_period_1_output_value
+      soc_sensor: sensor.hame_energy_hma_1_18cedf9836c6_battery_percentage
+      freigabe_id: input_boolean.marstek_entlade_freigabe
+      
+      # --- REGEL-PARAMETER ---
+      ziel_wert_tag: -100  # Prio auf Akkuladung (Einspeisung)
+      ziel_wert_nacht: 40  # Stability Floor (Netzbezug)
+      deadzone: 90         # Toleranzbereich in Watt
+      # -----------------------------------
+      
+      soc: "{{ states(soc_sensor) | float(0) }}"
+      ist_nacht: "{{ states('sun.sun') == 'below_horizon' }}"
+      ziel_wert: "{{ ziel_wert_nacht if ist_nacht else ziel_wert_tag }}"
+      
+      neue_freigabe: >-
+        {% if soc < 15 %} off 
+        {% elif soc > 20 %} on 
+        {% else %} {{ states(freigabe_id) }} {% endif %}
+
+  # SOC-Schutz Schalter umlegen
+  - if:
+      - condition: template
+        value_template: "{{ states(freigabe_id) != neue_freigabe }}"
+    then:
+      - action: input_boolean.turn_{{ neue_freigabe }}
+        target:
+          entity_id: input_boolean.marstek_entlade_freigabe
+
+  - choose:
+      # FALL 1: Hand-Modus oder Akku leer -> Sicherheits-Anker 40W
+      - conditions:
+          - condition: or
+            conditions:
+              - condition: state
+                entity_id: input_boolean.marstek_hand_modus
+                state: "on"
+              - condition: template
+                value_template: "{{ neue_freigabe == 'off' }}"
+        sequence:
+          - action: number.set_value
+            target:
+              entity_id: "{{ regler_id }}"
+            data:
+              value: 40
+              
+      # FALL 2: Automatik-Modus aktiv
+      - conditions:
+          - condition: state
+            entity_id: input_boolean.marstek_hand_modus
+            state: "off"
+          - condition: template
+            value_template: "{{ neue_freigabe == 'on' }}"
+          # Zeit-Sperre gegen WLAN-Überlastung (20 Sek Intervall bei Stabilisierung)
+          - condition: template
+            value_template: >-
+              {{ (now() - state_attr('automation.marstek_v1_0_8_dynamic_turbo_stable',
+              'last_triggered')) | total_seconds() > 15 
+                 if state_attr('automation.marstek_v1_0_8_dynamic_turbo_stable', 'last_triggered') is not none else true }}
+        sequence:
+          - variables:
+              aktuell: "{{ states(regler_id) | float(40) }}"
+              netz: "{{ states('sensor.netz_gesamtbezug') | float(0) }}"
+              fehler: "{{ netz - ziel_wert }}"
+              
+              # DYNAMISCHES LIMIT (Die Kunst der Regelung)
+              dynamic_limit: "{{ 150 if fehler | abs > 150 else 20 }}"
+              
+              step: |-
+                {% if fehler < -deadzone %}
+                  {{ [fehler, -dynamic_limit] | max }}
+                {% elif fehler > deadzone %}
+                  {{ [fehler, dynamic_limit] | min }}
+                {% else %}
+                  0
+                {% endif %}
+              final_soll: "{{ (aktuell + step) | float }}"
+          
+          - if:
+              - condition: template
+                value_template: "{{ step | abs > 0 }}"
+            then:
+              - action: number.set_value
+                target:
+                  entity_id: "{{ regler_id }}"
+                data:
+                  # Runden auf 10er Schritte, Minimum 40W (Anti-Bug), Maximum 800W
+                  value: >-
+                    {{ [[((final_soll / 10) | round(0) * 10), 40] | max, 800] | min }}
+
+mode: restart
