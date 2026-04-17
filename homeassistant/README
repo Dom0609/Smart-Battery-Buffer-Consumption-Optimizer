@@ -1,0 +1,45 @@
+# Dokumentation: Automation v1.0.8 (Dynamic Turbo)
+
+Diese Version ist die aktuelle Empfehlung für alle Marstek B2500 / HAME HMJ-2 Systeme, die über MQTT gesteuert werden. Sie wurde speziell entwickelt, um Hardware-Instabilitäten bei schwankendem WLAN-Empfang zu eliminieren.
+
+## 🛠️ Voraussetzungen (Helfer)
+Damit die Logik funktioniert, müssen vorab folgende Helfer in Home Assistant angelegt werden (Einstellungen -> Geräte & Dienste -> Helfer):
+
+1.  **input_boolean.marstek_hand_modus** (Typ: Schalter)
+    * Deaktiviert die Automatik für Wartungszwecke.
+2.  **input_boolean.marstek_entlade_freigabe** (Typ: Schalter)
+    * Wird von der Logik gesteuert (SOC-Schutz < 15%).
+3.  **sensor.netz_gesamtbezug** (Typ: Sensor, Watt)
+    * Die Summe deines Shelly Pro 3EM (L1+L2+L3).
+
+---
+
+## 🎨 Die Kunst der Feinabstimmung
+Ein statisches Skript passt nie perfekt auf jedes Haus. Die wahre Effizienz entsteht durch deine individuelle Anpassung der Variablen im YAML-Code. Betrachte die v1.0.8 als stabiles Fundament, auf dem du dein persönliches Setup aufbaust.
+
+### 1. Die Zielwerte (`ziel_wert`)
+* **Standard:** `-100W` (Tag) / `+40W` (Nacht).
+* **Anpassung:** Beobachte dein System. Wenn du trotz Regelung zu viel einspeist, erhöhe den negativen Zielwert (z.B. auf `-120W`). Gehe nachts so nah an `0W` wie möglich, aber beachte den **40W Stability Floor**, um den 500W-Bug zu vermeiden.
+
+### 2. Die Totzone (`deadzone`)
+* **Standard:** `90W`.
+* **Anpassung:** Hier entscheidest du zwischen Ruhe und Gier. Eine kleinere Deadzone (z.B. 40W) regelt nervöser nach, eine größere (z.B. 120W) schont die Hardware, lässt aber mehr Schwankungen durch.
+
+### 3. Die Schrittweite (`dynamic_limit`)
+* **Standard:** `150W` (Turbo) / `20W` (Precision).
+* **Anpassung:** Wenn dein Wechselrichter zum "Schwingen" neigt (er schießt über das Ziel hinaus), reduziere die `20W` auf `10W`. Wenn er zu träge auf Großverbraucher reagiert, erhöhe das Turbo-Limit.
+
+---
+
+## 🔬 Technischer Hintergrund: Der 40W Stability Floor
+Warum senden wir niemals `0W`?
+Bei einem Zielwert von `0W` und schlechtem WLAN-Empfang (RSSI < -80dBm) neigt die Marstek-Firmware dazu, in einen Fehlerzustand zu springen und unkontrolliert mit **500W Fallback-Leistung** einzuspeisen. 
+
+Die v1.0.8 erzwingt eine Mindestlast von **40W**. Dies hält die MQTT-Verbindung "warm", stabilisiert den internen Regler des Speichers und verhindert teure Fehl-Einspeisungen ins öffentliche Netz.
+
+---
+
+## ⚙️ Setup-Checkliste im YAML
+1.  **regler_id:** Ersetze die Entity durch deine `number.hame_..._output_value`.
+2.  **soc-sensor:** Ersetze `sensor.hame_..._battery_percentage` durch deinen Sensor.
+3.  **Intervall:** Die Automation triggert alle 20 Sekunden (bzw. bei großen Lastsprüngen), um das Netzwerk stabil zu halten.
