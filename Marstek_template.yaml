@@ -1,0 +1,18 @@
+# Template für den emulierten Zählerwert
+- sensor:
+    - name: "Marstek Steuerung Input"
+      unique_id: marstek_control_v2
+      unit_of_measurement: "W"
+      state: >
+        {% set echt_netz = states('sensor.netz_gesamtbezug') | float(0) %}
+        {% set pv_power = states('sensor.hame_energy_hma_1_18cedf9836c6_total_input_power') | float(0) %}
+        {% set soc = states('sensor.hame_energy_hma_1_18cedf9836c6_host_battery_soc') | float(0) %}
+        {% set akku_fluss = states('sensor.hame_energy_hma_1_18cedf9836c6_battery_power') | float(0) %}
+
+        {% if pv_power > 850 or soc > 97 or akku_fluss > 10 %}
+          {# TAG-MODUS: Aggressives Laden & Überschuss sichern #}
+          {{ echt_netz + 100 }}
+        {% else %}
+          {# NACHT-MODUS: Akku-Schutz & Verbrauchs-Optimierung #}
+          {{ echt_netz - 30 }}
+        {% endif %}
