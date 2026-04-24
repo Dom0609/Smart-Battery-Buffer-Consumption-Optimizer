@@ -1,3 +1,8 @@
+# Marstek/Hame Smart Battery Optimizer Template v2.0
+# WICHTIG: Ersetze die Sensor-Namen unten durch deine tatsächlichen Home Assistant Entity-IDs!
+# sensor.netz_gesamtbezug -> Dein Shelly/Smart Meter Power Sensor
+# sensor.hame_energy_...   -> Deine Marstek/Hame MQTT Sensoren
+
 # Template für den emulierten Zählerwert
 - sensor:
     - name: "Marstek Steuerung Input"
