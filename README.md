@@ -56,6 +56,12 @@ Das System nutzt ein spezialisiertes Home Assistant Template, um das Verhalten d
 
 ---
 
+---
+
+## ❤️ Ein besonderer Dank
+
+Ein riesiges Dankeschön geht an **tomquist**. Seine herausragende Arbeit an der MQTT-Bridge (`hm2mqtt`) und dem `AstraMeter` Add-on bildet das Fundament für dieses Projekt. Ohne seine Tools wäre die Kommunikation mit der Marstek-Hardware und die stabile Zähler-Emulation nicht möglich gewesen. Danke für deinen Einsatz für die Community! 🚀
+
 ## 🤝 Credits & Mitarbeit
 
 * **MQTT-Brücke:** [tomquist/hm2mqtt](https://github.com/tomquist/hm2mqtt)
