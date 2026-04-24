@@ -1,71 +1,78 @@
-# Smart Battery Buffer & Consumption Optimizer (v1.0.8)
+# Smart Battery Buffer & Consumption Optimizer (v2.0 - 2026 Edition)
 
-⚠️ **STATUS: STABLE RELEASE (17. April 2026)**
-Dieses Repository bietet eine hochstabile Steuerung für Marstek/Hame Speichersysteme via MQTT. Das System nutzt eine **Dynamic-Turbo-Strategie**, um Hardware-Latenzen und das Zusammenspiel mehrerer Wechselrichter (z.B. bei paralleler PV1-Einspeisung) perfekt auszugleichen.
+![Status](https://img.shields.io/badge/Status-Stable_Release-green)
+![Hardware](https://img.shields.io/badge/Hardware-Marstek_B2500_%7C_Hame_HMJ--2-blue)
+![Platform](https://img.shields.io/badge/Platform-Home_Assistant-orange)
 
-🚀 **Neu in v1.0.8: Der Stability-Patch**
-Dieses Update adressiert kritische Hardware-Phänomene (wie den 500W-Fallback-Bug), die besonders bei schwacher WLAN-Anbindung (RSSI < -80dBm) auftreten.
-* **Anti-Bounce (40W Floor):** Verhindert unkontrollierte Leistungssprünge durch eine Mindestlast-Sicherung von 40W.
-* **WLAN-Resilience:** Optimierte Timeouts für stabile Steuerung bei schwierigen Empfangsbedingungen.
-* **Dynamic Turbo:** Adaptive Regelschritte (150W / 20W) für maximale Präzision ohne Aufschwingen.
+Dieses Repository bietet eine hochstabile Steuerung für Marstek/Hame Speichersysteme. Nach der Entwicklung der manuellen MQTT-Steuerung (v1.0.8) wurde das System auf eine **Zähler-Emulation via AstraMeter** umgestellt, um Hardware-Latenzen zu eliminieren und den 1680W PV-Ausbau perfekt zu managen.
 
 ---
 
-## Über dieses Projekt
-Ziel dieses Projekts von **Dom0609** ist eine robuste Steuerung des Marstek B2500 / HAME HMJ-2 Speichers. Im Fokus steht eine intelligente Zielwert-Steuerung, die Systemstabilität und Hardware-Langlebigkeit priorisiert (ausgelegt auf einen 10-Jahres-Betrieb).
+## 📢 DER STRATEGIEWECHSEL (April 2026)
 
-## 🏗️ Das Szenario: Hybrid-Ready & Stand-alone
-Die Logik ist für zwei Einsatzszenarien optimiert:
-1.  **Hybrid-Setup:** Speicher parallel zu einem zweiten, ungeregelten Wechselrichter (PV1).
-2.  **Stand-alone:** Hochstabile Einzelsteuerung für den Speicher.
+Nach intensiven Langzeittests hat sich gezeigt: Die direkte Steuerung per Watt-Befehlen (v1.0.8) ist anfällig für den "500W-Fallback-Bug" und WLAN-Latenzen. 
 
-| Feature | Legacy (V3.0 ESP32/BLE) | Aktuell (v1.0.8 Stable) |
-| :--- | :--- | :--- |
-| **Latenz** | ca. 14 Sekunden | **< 1 Sekunde** |
-| **WLAN-Stabilität** | Funkabhängig (Bluetooth) | **Hoch (MQTT Keep-Alive)** |
-| **Regelverhalten** | Träge & schwingungsanfällig | **Dynamic Turbo (Adaptive)** |
-| **Min. Output** | 0W (Instabil / Bug-Gefahr) | **40W (Stable Floor)** |
+**Die neue Gold-Standard-Lösung:** Wir nutzen weiterhin die MQTT-Anbindung (`hm2mqtt`), aber anstatt den Speicher aktiv zu "schieben", emulieren wir einen **Shelly Pro 3EM** (via AstraMeter Add-on). Der Marstek nutzt so seinen internen, nativen Regelalgorithmus, was die Stabilität massiv erhöht.
 
 ---
 
-## 💡 Regelungskonzept: Dynamic Turbo Strategy
+## 🏗️ Das Setup (Hybrid-Ready)
 
-### 1. Adaptive Regelschritte
-* **Turbo-Modus:** Bei großen Abweichungen (>150W) regelt das System massiv nach.
-* **Precision-Modus:** Im Zielbereich regelt das System in sanften **20W-Schritten**, um die Blindleistung des Shelly Pro 3EM auszugleichen.
-
-### 2. Smart-Targeting & Offsets
-* **40W Keep-Alive Floor:** Das System sendet niemals **0W**. Diese Mindestlast hält die Kommunikation aktiv und verhindert den berüchtigten 500W-Fallback-Bug der Firmware.
-* **Zielwerte:** Nachts wird ein minimaler Netzbezug von **+40W** angestrebt, um Akku-Energie als Puffer zu halten. Tagsüber wird auf **-100W** geregelt, um PV1-Überschuss vorrangig in den Akku zu leiten.
-
-### 📈 Live-Regelverhalten (v1.0.8)
-Hier sieht man das System im Live-Einsatz. Die gelbe Linie (Speicher) folgt präzise dem Hausverbrauch, während die blaue Linie (Netz) stabil im Zielbereich gehalten wird.
-
-![Live Performance](./homeassistant/images/performance_graph.png)
+Mein System ist auf maximale Effizienz ausgelegt:
+* **Speicher:** Marstek B2500 / Hame HMJ-2.
+* **PV-Leistung:** 1680Wp (massive Überbelegung für Schlechtwetter-Performance).
+* **Zusatz-WR:** Ein Deye Wechselrichter läuft parallel an PV1.
+* **Messung:** Shelly Pro 3EM am Hausanschluss.
 
 ---
 
-## 🛠️ Installation & Setup
-1.  **MQTT Freischaltung:** Muss zuvor über den Marstek-Support (App-Feedback) beantragt werden.
-2.  **Bridge-Setup:** Installation des [hm2mqtt Add-ons](https://github.com/tomquist/hm2mqtt).
-3.  **Home Assistant:** Die Datei `/homeassistant/v1.0.8 - Dynamic Turbo/marstek_v1_0_8_stable.yaml` importieren.
-4.  **Helfer:** Folgende Entitäten müssen in HA angelegt sein:
-    * `input_boolean.marstek_hand_modus` (Manueller Stop)
-    * `input_boolean.marstek_entlade_freigabe` (SOC-Schutz)
-    * `sensor.netz_gesamtbezug` (Summe der Shelly-Phasen)
+## 💡 Die Logik: Intelligente Offsets (v2.0)
 
-## 📁 Archiv & Legacy-Versionen
-Falls du noch die alte Hardware-Anbindung via ESP32 und Bluetooth nutzt oder eine ältere MQTT-Version suchst:
-* 👉 [Legacy V3.0 (ESP32/BLE) Archiv](./homeassistant/legacy_v3_ble_esp32/)
-* 👉 [v1.0.0 Stable (MQTT Archiv)](./homeassistant/v1.0.0%20-%20Stable/)
+Damit das System bei 1680W PV nicht "nervös" wird und nachts keinen Strom verschenkt, nutze ich ein spezialisiertes Home Assistant Template für den AstraMeter-Sensor:
 
----
+```yaml
+# Template für den emulierten Zählerwert
+- sensor:
+    - name: "Marstek Steuerung Input"
+      unique_id: marstek_control_v2
+      unit_of_measurement: "W"
+      state: >
+        {% set echt_netz = states('sensor.netz_gesamtbezug') | float(0) %}
+        {% set pv_power = states('sensor.hame_energy_hma_1_18cedf9836c6_total_input_power') | float(0) %}
+        {% set soc = states('sensor.hame_energy_hma_1_18cedf9836c6_host_battery_soc') | float(0) %}
+        {% set akku_fluss = states('sensor.hame_energy_hma_1_18cedf9836c6_battery_power') | float(0) %}
 
-## 🤝 Feedback & Mitarbeit
-Optimierungsvorschläge sind jederzeit willkommen! Eröffne gerne ein **Issue** oder einen **Pull Request**.
+        {% if pv_power > 850 or soc > 97 or akku_fluss > 10 %}
+          {# TAG-MODUS: Aggressives Laden & Überschuss sichern #}
+          {{ echt_netz + 100 }}
+        {% else %}
+          {# NACHT-MODUS: Akku-Schutz & Verbrauchs-Optimierung #}
+          {{ echt_netz - 30 }}
+        {% endif %}
 
-**Credits:**
-* MQTT-Brücke: [tomquist/hm2mqtt](https://github.com/tomquist/hm2mqtt)
-* Konzept & Entwicklung: **Dom0609**
+🏗️ Hardware-Szenario: Hybrid-Ready
+Das System von Dom0609 ist für den parallelen Einsatz optimiert:
 
-*Dokumentationsstand: April 2026*
+Hybrid-Setup: Speicher parallel zu einem zweiten, ungeregelten Wechselrichter (Deye auf PV1).
+
+Stand-alone: Hochstabile Einzelsteuerung für den Speicher.
+
+PV-Power: 1680Wp Gesamteingang am Marstek für maximale Schlechtwetter-Performance.
+
+🛠️ Installation & Setup
+MQTT Freischaltung: Muss über den Marstek-Support (App-Feedback) beantragt werden.
+
+Bridge-Setup: Installation des hm2mqtt Add-ons.
+
+Emulation: AstraMeter installieren und das obige Template als Sensor-Quelle nutzen.
+
+🤝 Credits & Mitarbeit
+Optimierungsvorschläge sind jederzeit willkommen! Eröffne gerne ein Issue oder einen Pull Request.
+
+MQTT-Brücke: tomquist/hm2mqtt
+
+Emulations-Basis: tomquist/AstraMeter
+
+Konzept & Entwicklung: Dom0609
+
+Dokumentationsstand: April 2026
