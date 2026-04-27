@@ -1,6 +1,8 @@
 # 🔋 Smart Battery Buffer & Consumption Optimizer (v2.1)
 
-Dieses Repository bietet eine stabile Steuerung für **Marstek B2500 / Hame HMJ-2** Speichersysteme in Home Assistant. Optimiert für Hybrid-Systeme mit paralleler Einspeisung (z.B. durch einen zusätzlichen Deye-Wechselrichter).
+Dieses Repository bietet eine stabile Steuerung für **Marstek B2500 / Hame HMJ-2** Speichersysteme in Home Assistant. 
+
+**Vielseitig einsetzbar:** Die Steuerung ist für Hybrid-Systeme (z.B. mit zusätzlichem Deye-Wechselrichter) optimiert, funktioniert aber ebenso hervorragend in Standard-Setups mit nur einem Wechselrichter.
 
 ---
 
@@ -32,16 +34,16 @@ Ein dekalibriertes BMS war bei meinen Tests die Hauptursache für MPPT-Abschaltu
 * 🎯 **Gezielte Dämpfung:** Ein P-Regler (Faktor 0.7) verhindert das Aufschwingen des Systems.
 * 💤 **80W Deadzone:** Hält das System bei kleinen Schwankungen ruhig und schont die Hardware.
 * ⚡ **Anti-Shutdown Logik:** Bei hohem SOC wird die Regelung stabilisiert, um MPPT-Tracker aktiv zu halten.
-* 📡 **Smart State-Check:** Sendet Befehle nur bei tatsächlicher Wertänderung (schont WLAN/MQTT-Broker).
+* 🔋 **Flexibilität:** Funktioniert im Verbund mit anderen WR oder als alleinige Haussteuerung.
 
 ---
 
-## 🏗️ DAS SETUP
+## 🏗️ MEIN SETUP (Beispiel)
 * **Speicher:** Marstek B2500 / Hame HMJ-2
 * **Solar:** 1680Wp (Massive Überbelegung für starke Performance auch bei Bewölkung)
-* **Wechselrichter 1:** Deye (Parallelbetrieb zur Grundlastdeckung)
-* **Wechselrichter 2:** Marstek MI800 (Direkt am B2500 Speicher)
-* **Messung:** Shelly Pro 3EM am zentralen Netzübergang
+* **Hybrid-Betrieb:** Parallelbetrieb mit einem Deye (Grundlast) und einem Marstek MI800 (Speicher-WR).
+* **Single-Betrieb:** Die Automation funktioniert identisch, wenn nur der MI800 vorhanden ist. In diesem Fall können die Offsets (Tag/Nacht) in der YAML nach Belieben reduziert werden.
+* **Messung:** Shelly Pro 3EM am zentralen Netzübergang.
 
 ---
 
