@@ -1,13 +1,19 @@
 # 🔋 Smart Battery Buffer & Consumption Optimizer (v2.1)
 
-Dieses Repository bietet eine hochstabile und präzise Steuerung für **Marstek B2500 / Hame HMJ-2** Speichersysteme in Home Assistant. Optimiert für Hybrid-Systeme mit paralleler Einspeisung (z.B. Deye).
+Dieses Repository bietet eine stabile Steuerung für **Marstek B2500 / Hame HMJ-2** Speichersysteme in Home Assistant. Optimiert für Hybrid-Systeme mit paralleler Einspeisung (z.B. durch einen zusätzlichen Deye-Wechselrichter).
+
+---
+
+### 🛠️ Der Weg zu v2.1 (Learning by Doing)
+Dieses Projekt war ein ziemlicher Prozess. Von der ersten MQTT-Steuerung über Versuche mit Zähler-Emulationen bis hin zur jetzigen Version war es ein holpriger Weg mit vielen Korrekturen und Frustmomenten. 
+
+Am Ende stellte sich heraus: Die stabilste Software bringt wenig, wenn das BMS der Hardware nicht sauber kalibriert ist. Die v2.1 kombiniert nun die Hardware-Erkenntnisse (BMS-Fix) mit einer gedämpften Software-Regelung, die auch bei Lastwechseln Ruhe ins System bringt.
 
 ---
 
 ## 📢 DER "BMS-FIX": Die Hardware-Basis (April 2026) 🛠️
-Ein dekalibriertes BMS war die Hauptursache für MPPT-Abschaltungen und instabile Regelungen. 
+Ein dekalibriertes BMS war bei meinen Tests die Hauptursache für MPPT-Abschaltungen und instabile Regelungen. Bevor die Automation genutzt wird, empfehle ich dringend diesen Kalibrierungsweg:
 
-**Empfohlener Kalibrierungsweg vor Start der Automation:**
 1. 📈 **Volladen:** Den Akku auf 100% laden.
 2. 🔄 **Reset:** Hardware-Reset in der Marstek-App bei 100% SOC auslösen.
 3. 📉 **Entladen:** Kontrolliert auf 0% entladen lassen (idealerweise ohne extreme Lastspitzen).
@@ -16,17 +22,17 @@ Ein dekalibriertes BMS war die Hauptursache für MPPT-Abschaltungen und instabil
 ---
 
 ## 🚀 PROJEKT-EVOLUTION
-* **v1.0.8** ➔ Erste stabile MQTT-Direktsteuerung.
-* **v2.0** ➔ Strategiewechsel: Zähler-Emulation via AstraMeter.
-* **v2.1** ➔ **"The Precision Update"**: Rückkehr zur Direktsteuerung nach erfolgreichem BMS-Fix. Höchste Stabilität durch Software-Intelligenz.
+* **v1.0.8** ➔ Erste MQTT-Direktsteuerung.
+* **v2.0** ➔ Versuch der Zähler-Emulation via AstraMeter.
+* **v2.1** ➔ **"The Precision Update"**: Rückkehr zur Direktsteuerung nach erfolgreichem BMS-Fix. Höchste Stabilität durch Software-Dämpfung.
 
 ---
 
 ## 💡 WARUM v2.1 (v1.1 AUTOMATION)?
-* 🎯 **Gezielte Dämpfung:** P-Regler (Faktor 0.7) verhindert das Aufschwingen des Systems.
+* 🎯 **Gezielte Dämpfung:** Ein P-Regler (Faktor 0.7) verhindert das Aufschwingen des Systems.
 * 💤 **80W Deadzone:** Hält das System bei kleinen Schwankungen ruhig und schont die Hardware.
-* ⚡ **Anti-Shutdown Logik:** Bei SOC > 98% wird ein kleiner Bypass-Strom erzwungen, um die MPPT-Tracker aktiv zu halten.
-* 📡 **Smart State-Check:** Minimiert WLAN-Traffic durch Senden nur bei tatsächlicher Wertänderung.
+* ⚡ **Anti-Shutdown Logik:** Bei hohem SOC wird die Regelung stabilisiert, um MPPT-Tracker aktiv zu halten.
+* 📡 **Smart State-Check:** Sendet Befehle nur bei tatsächlicher Wertänderung (schont WLAN/MQTT-Broker).
 
 ---
 
@@ -39,11 +45,19 @@ Ein dekalibriertes BMS war die Hauptursache für MPPT-Abschaltungen und instabil
 
 ---
 
+## 🤝 MITARBEIT & FEEDBACK
+Das System läuft bei mir jetzt hervorragend, aber jedes Hausnetz und jedes Setup ist individuell. 
+* Wenn dir Fehler auffallen oder du eine bessere Idee für die Regel-Logik hast: **Immer her damit!**
+* Eröffne gerne ein **Issue** oder beteilige dich an den **Discussions**.
+* Besonders Optimierungen für Reaktionszeiten oder smartere Offsets sind jederzeit willkommen.
+
+---
+
 ## 🛠️ INSTALLATION & SETUP
-1.  **MQTT:** Local MQTT via Marstek-Support freischalten lassen.
-2.  **Bridge:** [hm2mqtt](https://github.com/tomquist/hm2mqtt) Add-on installieren.
-3.  **Automation:** `Marstek_v1.1.yaml` importieren und Entitäten anpassen.
-4.  **Dashboard:** Empfohlen wird die **Lovelace Horizon Card** für den Sonnenverlauf.
+1. **MQTT:** Local MQTT via Marstek-Support freischalten lassen.
+2. **Bridge:** [hm2mqtt](https://github.com/tomquist/hm2mqtt) Add-on installieren.
+3. **Automation:** Die Datei `/homeassistant/Marstek_Direct_Control_v1.1.yaml` importieren und Entitäten anpassen.
+4. **Doku:** Beachte die spezifische [YAML-Dokumentation im Unterordner](/homeassistant/).
 
 ---
 
