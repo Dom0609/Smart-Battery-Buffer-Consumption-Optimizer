@@ -1,0 +1,123 @@
+#################################################################################
+# Smart Battery Buffer & Consumption Optimizer - v1.1 (Precision Release)
+# Autor: Dom0609 | Stand: 27. April 2026
+#################################################################################
+
+alias: "Marstek v1.1"
+description: >-
+  Regelt alle 3s mit Dämpfung. Modus ist fest auf 'Simultaneous Charging/Discharging'
+  gesetzt. Optimiert nach BMS-Kalibrierung.
+
+triggers:
+  - trigger: time_pattern
+    seconds: /03
+  - trigger: state
+    entity_id: input_boolean.marstek_hand_modus # <--- DEIN HANDSCHALTER
+
+actions:
+  - variables:
+      # ==========================================
+      #   START: USER-KONFIGURATION (ANPASSEN!)
+      # ==========================================
+      regler_id: number.hame_energy_hma_1_18cedf9836c6_time_period_1_output_value # DEIN OUTPUT-REGLER
+      soc_sensor: sensor.hame_energy_hma_1_18cedf9836c6_host_battery_soc          # DEIN SOC-SENSOR
+      scene_sensor: sensor.hame_energy_hma_1_18cedf9836c6_scene                   # DEIN SCENE-SENSOR (TAG/NACHT)
+      modus_select: select.hame_energy_hma_1_18cedf9836c6_charging_mode           # DEIN MODUS-WÄHLER
+      freigabe_id: input_boolean.marstek_entlade_freigabe                         # DEIN FREIGABE-SCHALTER
+      
+      # DEIN NETZ-SENSOR (z.B. vom Shelly Pro 3EM)
+      netz_sensor: sensor.netz_gesamtbezug 
+      # ==========================================
+      #   ENDE: USER-KONFIGURATION
+      # ==========================================
+
+      soc: "{{ states(soc_sensor) | float(0) }}"
+      aktuelle_scene: "{{ states(scene_sensor) }}"
+      target_mode: "Simultaneous Charging/Discharging"
+      
+      neue_freigabe: >-
+        {% if soc < 15 %} off 
+        {% elif soc > 20 %} on  
+        {% else %} {{ states(freigabe_id) | default('off') }} 
+        {% endif %}
+
+  # Schritt 1: Modus-Check
+  - if:
+      - condition: template
+        value_template: "{{ states(modus_select) != target_mode }}"
+    then:
+      - action: select.select_option
+        target:
+          entity_id: "{{ modus_select }}"
+        data:
+          option: "{{ target_mode }}"
+
+  # Schritt 2: SOC-Freigabe
+  - if:
+      - condition: template
+        value_template: "{{ states(freigabe_id) != neue_freigabe }}"
+    then:
+      - action: input_boolean.turn_{{ neue_freigabe }}
+        target:
+          entity_id: "{{ freigabe_id }}"
+
+  # Schritt 3: Regelung
+  - choose:
+      - conditions:
+          - condition: or
+            conditions:
+              - condition: state
+                entity_id: input_boolean.marstek_hand_modus
+                state: "on"
+              - condition: state
+                entity_id: input_boolean.marstek_entlade_freigabe
+                state: "off"
+        sequence:
+          - if:
+              - condition: template
+                value_template: "{{ states(regler_id) | float > 40 }}"
+            then:
+              - action: number.set_value
+                target:
+                  entity_id: "{{ regler_id }}"
+                data:
+                  value: 40
+
+      - conditions:
+          - condition: state
+            entity_id: input_boolean.marstek_hand_modus
+            state: "off"
+          - condition: state
+            entity_id: input_boolean.marstek_entlade_freigabe
+            state: "on"
+        sequence:
+          - variables:
+              netz: "{{ states(netz_sensor) | float(0) }}"
+              aktuell: "{{ states(regler_id) | float(40) }}"
+              ziel_wert: "{{ 40 if aktuelle_scene in ['Night', 'Dusk/Dawn'] else -100 }}"
+              fehler: "{{ netz - ziel_wert }}"
+              raw_step: "{{ (fehler * 0.7) | round(0) }}"
+              deadzone: 80
+              dynamic_limit: "{{ 200 if fehler | abs > 200 else 40 }}"
+              step: |-
+                {% if fehler < -deadzone %} 
+                  {{ [raw_step, -dynamic_limit] | max }}
+                {% elif fehler > deadzone %} 
+                  {{ [raw_step, dynamic_limit] | min }}
+                {% else %} 
+                  0 
+                {% endif %}
+              final_soll: "{{ (aktuell + step) | float }}"
+
+          - if:
+              - condition: template
+                value_template: "{{ step | abs > 0 }}"
+            then:
+              - action: number.set_value
+                target:
+                  entity_id: "{{ regler_id }}"
+                data:
+                  value: >-
+                    {{ [[((final_soll / 10) | round(0) * 10), 40] | max, 800] | min }}
+
+mode: restart
