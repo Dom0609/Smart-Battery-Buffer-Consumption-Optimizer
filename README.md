@@ -1,73 +1,45 @@
-# Smart Battery Buffer & Consumption Optimizer (v2.0)
+# Smart Battery Buffer & Consumption Optimizer (v2.1)
 
-![Release](https://img.shields.io/badge/Release-v2.0--2026-gold?style=for-the-badge)
-![Hardware](https://img.shields.io/badge/Hardware-Marstek%20|%20Hame-blue?style=for-the-badge)
-![Platform](https://img.shields.io/badge/Platform-Home%20Assistant-integrated?style=for-the-badge)
+Dieses Repository bietet eine hochstabile und präzise Steuerung für **Marstek B2500 / Hame HMJ-2** Speichersysteme in Home Assistant. Es ist speziell darauf optimiert, Hand in Hand mit zusätzlichen Wechselrichtern (z. B. **Deye**) zu arbeiten, um eine perfekte Nulleinspeisung zu erreichen.
 
-Dieses Repository bietet eine hochstabile Steuerung für **Marstek B2500 / Hame HMJ-2** Speichersysteme. Nach intensiver Arbeit mit der manuellen MQTT-Steuerung (v1.0.8) wurde das System auf **Zähler-Emulation via AstraMeter** umgestellt.
+## 📢 Der "BMS-Fix": Die Hardware-Basis (April 2026)
+Der wichtigste Durchbruch in der Entwicklung war die Erkenntnis, dass viele Regelungsprobleme (MPPT-Abschaltungen, "Ruckeln", Ignorieren von Befehlen) auf ein dekalibriertes BMS zurückzuführen sind. 
 
----
+**Bevor die Automation genutzt wird, wird dieser Kalibrierungsweg dringend empfohlen:**
+1. **Volladen:** Den Akku auf 100 % laden.
+2. **Reset:** In der Marstek-App den **Hardware-Reset** auslösen (während der Akku bei 100 % steht).
+3. **Entladen:** Den Akku kontrolliert auf **0 %** entladen lassen.
+4. **Laden:** Den Akku wieder auf **100 %** aufladen, **ohne dabei Energie zu entnehmen** (kein aktiver Output).
 
-## 📢 DER STRATEGIEWECHSEL (April 2026)
+Erst durch diesen Reset-Zyklus kennt das BMS die Kapazitätsgrenzen wieder korrekt, was die Voraussetzung für eine stabile MQTT-Steuerung ist.
 
-Nach Langzeittests steht fest: Die direkte Steuerung per Watt-Befehlen via `hm2mqtt` stößt an die Grenzen der **internen Marstek-Logik**. 
+## 🚀 Projekt-Evolution
+* **v1.0.8:** Erste stabile MQTT-Direktsteuerung.
+* **v2.0 (AstraMeter):** Strategiewechsel zur Zähler-Emulation (Shelly Pro 3EM Fake).
+* **v2.1 "The Precision Update":** Rückkehr zur Direktsteuerung. Dank Software-Dämpfung und der BMS-Kalibrierung bietet dieser Weg nun die höchste Präzision und Stabilität.
 
-**Das Problem:** Bei direkter Steuerung neigt die Hardware dazu, bei vollem Akku die PV-Eingänge komplett abzuschalten, anstatt den Überschuss intelligent durchzureichen. Zudem führen WLAN-Latenzen oft zu einer verzögerten oder "ruckeligen" Regelung.
+## 💡 Warum v2.1 (Automation v1.1)?
+Im Gegensatz zur "Blackbox" der internen Marstek-Logik erlaubt diese Automation volle Kontrolle:
+* **Gezielte Dämpfung:** Ein P-Regler (Faktor 0.7) verhindert das Aufschwingen des Systems bei schnellen Lastwechseln.
+* **80W Deadzone (Totzone):** Das System bleibt bei kleinen Schwankungen ruhig. Dies schont die Hardware, entlastet das WLAN und sorgt für ein sauberes Schriftbild im Dashboard.
+* **Anti-Shutdown Logik:** Bei einem SOC > 98 % erzwingt das System einen kleinen Bypass-Strom (-150W Offset), um die MPPT-Eingänge aktiv zu halten und ein Abschalten der PV-Produktion bei vollem Akku zu verhindern.
+* **Smart State-Check:** Es werden nur Werte an den MQTT-Broker gesendet, wenn eine tatsächliche Änderung vorliegt.
 
-**Die Lösung:** Wir emulieren einen **Shelly Pro 3EM** (via AstraMeter Add-on). Anstatt dem Speicher starre Werte vorzugeben, liefern wir ihm nur die Verbrauchsdaten. Der Marstek nutzt so seinen **nativen Regelalgorithmus**. Das Ergebnis ist eine butterweiche Leistungsabgabe und ein stabiles Management der PV-Eingänge.
-
----
-
-## ⚠️ Lessons Learned: Warum dieser Weg?
-
-Ich habe dieses Repository erstellt, um anderen den Frust zu ersparen, den ich beim Versuch der direkten Hardware-Manipulation hatte:
-
-* **Eingangs-Abschaltung:** Die interne Logik schaltet bei vollem Akku oft die Eingänge ab; externe Watt-Befehle werden in diesem Zustand schlichtweg nicht mehr verarbeitet. 
-* **Regel-Harmonie:** Durch die Emulation arbeitet man *mit* der Hardware, nicht gegen sie. Der Speicher "denkt", er kommuniziert mit einem echten Shelly, was die stabilste Betriebsart darstellt.
-* **Effizienz:** Die 1680Wp werden durch den nativen Algorithmus viel sauberer verarbeitet, besonders im Übergang von Akku-Laden zu Netzeinspeisung.
-
----
-
-## 🏗️ Das Setup (Hybrid-Ready)
-
+## 🏗️ Das Setup
 * **Speicher:** Marstek B2500 / Hame HMJ-2.
-* **PV-Leistung:** 1680Wp (Massive Überbelegung für starke Performance bei Bewölkung).
-* **Zusatz-WR:** Ein Deye Wechselrichter läuft parallel an PV1.
-* **Messung:** Shelly Pro 3EM (Datenquelle für die Emulation).
+* **Solar:** 1680Wp (Massive Überbelegung für starke Performance bei Bewölkung).
+* **Hybrid-Betrieb:** Ein Deye Wechselrichter läuft parallel an PV1 zur Deckung der Grundlast.
+* **Messung:** Shelly Pro 3EM am Netzübergangspunk.
 
----
+## 🛠️ Installation & Konfiguration
+1.  **MQTT-Freischaltung:** Über den Marstek-Support (App-Feedback) beantragen ("Local MQTT enable").
+2.  **Bridge:** `hm2mqtt` Add-on von *tomquist* installieren.
+3.  **Automation:** Die `Marstek_v1.1.yaml` importieren und deine Entitäten anpassen.
 
-## 💡 Die Logik: Intelligente Offsets (v2.0)
 
-Das System nutzt ein spezialisiertes Home Assistant Template, um das Verhalten des Speichers zu optimieren:
-* **TAG-MODUS (+100W Offset):** Priorisiert das Laden bei hoher PV-Leistung (>850W) oder hohem SoC.
-* **NACHT-MODUS (-30W Offset):** Bildet einen Puffer, um Netzbezug bei Lastspitzen zu minimieren.
+## ❤️ Credits
+Ein riesiges Dankeschön geht an **tomquist** für seine Arbeit an `hm2mqtt` und `AstraMeter`. Dieses Projekt baut auf seinem Fundament auf und ergänzt es um eine spezialisierte Regelungslogik.
 
-> 📄 **Konfiguration:** Das passende Template findest du hier: [Marstek_template.yaml](./Marstek_template.yaml)
-
----
-
-## 🛠️ Installation & Setup
-
-1. **MQTT Freischaltung:** Über den Marstek-Support (App-Feedback) beantragen ("Local MQTT enable").
-2. **Bridge-Setup:** [hm2mqtt](https://github.com/tomquist/hm2mqtt) Add-on installieren.
-3. **Emulation:** [AstraMeter](https://github.com/tomquist/AstraMeter) installieren und das Template als Quelle wählen.
-4. **Kopplung:** In der Marstek App den emulierten Shelly als Smart Meter hinzufügen.
-
----
-
----
-
-## ❤️ Ein besonderer Dank
-
-Ein riesiges Dankeschön geht an **tomquist**. Seine herausragende Arbeit an der MQTT-Bridge (`hm2mqtt`) und dem `AstraMeter` Add-on bildet das Fundament für dieses Projekt. Ohne seine Tools wäre die Kommunikation mit der Marstek-Hardware und die stabile Zähler-Emulation nicht möglich gewesen. Danke für deinen Einsatz für die Community! 🚀
-
-## 🤝 Credits & Mitarbeit
-
-* **MQTT-Brücke:** [tomquist/hm2mqtt](https://github.com/tomquist/hm2mqtt)
-* **Emulations-Basis:** [tomquist/AstraMeter](https://github.com/tomquist/AstraMeter)
-* **Konzept & Entwicklung:** Dom0609
-
----
-**Dokumentationsstand:** April 2026
+**Dokumentationsstand:** 27. April 2026  
+**Entwickler:** Dom0609
 
